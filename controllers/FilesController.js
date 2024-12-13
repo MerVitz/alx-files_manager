@@ -2,10 +2,13 @@ import { v4 as uuidv4 } from 'uuid';
 import mime from 'mime-types';
 import fs from 'fs/promises';
 import path from 'path';
+import imageThumbnail from 'image-thumbnail';
 import dbClient from '../utils/db.js';
 import redisClient from '../utils/redis.js';
+import Bull from 'bull';
 
 const UPLOAD_PATH = process.env.UPLOAD_PATH || '/tmp/files';
+const fileQueue = new Bull('fileQueue');
 
 class FilesController {
   static async postUpload(req, res) {
@@ -21,7 +24,6 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Handle parentId validation
     let parentFile = null;
     if (parentId) {
       parentFile = await dbClient.files.findOne({ _id: parentId, userId });
@@ -45,6 +47,10 @@ class FilesController {
       const filePath = path.join(UPLOAD_PATH, fileId);
       await fs.writeFile(filePath, Buffer.from(data, 'base64'));
       file.localPath = filePath;
+
+      if (type === 'image') {
+        fileQueue.add({ fileId, userId });
+      }
     }
 
     const result = await dbClient.files.insertOne(file);
@@ -102,8 +108,15 @@ class FilesController {
       return res.status(400).json({ error: 'A folder doesn’t have content' });
     }
 
+    const size = req.query.size;
+    let filePath = file.localPath;
+
+    if (size && ['100', '250', '500'].includes(size)) {
+      filePath = `${file.localPath}_${size}`;
+    }
+
     try {
-      const content = await fs.readFile(file.localPath);
+      const content = await fs.readFile(filePath);
       const mimeType = mime.lookup(file.name) || 'application/octet-stream';
       res.setHeader('Content-Type', mimeType);
       res.status(200).send(content);
