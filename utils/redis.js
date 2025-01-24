@@ -18,14 +18,14 @@ class RedisClient {
   }
 
   isAlive() {
-    return this.client.isReady === true;
+    return this.client.isReady === true;  // Properly check Redis connection status
   }
 
   async get(key) {
     try {
       const value = await this.client.get(key);
       if (value === null) return null;
-      return isNaN(value) ? value : Number(value);  // Ensure numeric values return correctly
+      return isNaN(value) ? value : Number(value);
     } catch (err) {
       console.error('Error getting key from Redis:', err);
       return null;
@@ -35,7 +35,7 @@ class RedisClient {
   async set(key, value, duration) {
     try {
       await this.client.set(key, value.toString(), {
-        EX: duration,  // Correct expiration syntax
+        EX: duration,
       });
     } catch (err) {
       console.error('Error setting key in Redis:', err);
