@@ -22,7 +22,7 @@ class RedisClient {
       this.client.get(key, (err, value) => {
         if (err) {
           console.error('Error getting key from Redis:', err);
-          reject(null);
+          reject(new Error('Error getting key from Redis'));
         } else {
           resolve(value);
         }
@@ -35,7 +35,7 @@ class RedisClient {
       this.client.set(key, value, 'EX', duration, (err) => {
         if (err) {
           console.error('Error setting key in Redis:', err);
-          reject();
+          reject(new Error('Error setting key in Redis'));
         } else {
           resolve();
         }
@@ -48,7 +48,7 @@ class RedisClient {
       this.client.del(key, (err) => {
         if (err) {
           console.error('Error deleting key in Redis:', err);
-          reject();
+          reject(new Error('Error deleting key in Redis'));
         } else {
           resolve();
         }
