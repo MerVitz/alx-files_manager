@@ -12,18 +12,26 @@ class RedisClient {
       console.log('Redis Client Connected');
     });
 
-    this.client.connect().catch((err) => {
-      console.error('Error connecting to Redis:', err);
-    });
+    this.connectRedis();
+  }
+
+  async connectRedis() {
+    try {
+      await this.client.connect();
+      console.log('Connected to Redis successfully');
+    } catch (err) {
+      console.error('Failed to connect to Redis:', err);
+    }
   }
 
   isAlive() {
-    return this.client.isOpen;
+    return this.client.isReady;  // `isReady` correctly indicates Redis connection status
   }
 
   async get(key) {
     try {
-      return await this.client.get(key);
+      const value = await this.client.get(key);
+      return value !== null ? value : null;
     } catch (err) {
       console.error('Error getting key from Redis:', err);
       return null;
@@ -32,8 +40,8 @@ class RedisClient {
 
   async set(key, value, duration) {
     try {
-      await this.client.set(key, value, {
-        EX: duration,  // Set expiration time in seconds
+      await this.client.set(key, value.toString(), {
+        EX: duration,  // Use expiration (EX) correctly
       });
     } catch (err) {
       console.error('Error setting key in Redis:', err);
