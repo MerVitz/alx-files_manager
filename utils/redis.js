@@ -11,15 +11,20 @@ class RedisClient {
     this.client.on('ready', () => {
       console.log('Redis Client Connected');
     });
+
+    this.client.connect().catch((err) => {
+      console.error('Redis connection failed:', err);
+    });
   }
 
   isAlive() {
-    return this.client.connected;
+    return this.client.isReady;  // Correct property for checking Redis connection
   }
 
   async get(key) {
     try {
-      return await this.client.get(key);
+      const value = await this.client.get(key);
+      return value !== null ? value : null;  // Ensures proper null handling
     } catch (err) {
       console.error('Error getting key from Redis:', err);
       return null;
@@ -28,8 +33,9 @@ class RedisClient {
 
   async set(key, value, duration) {
     try {
-      await this.client.set(key, value);
-      await this.client.expire(key, duration);
+      await this.client.set(key, value.toString(), {
+        EX: duration,  // Use expiration correctly in one command
+      });
     } catch (err) {
       console.error('Error setting key in Redis:', err);
     }
