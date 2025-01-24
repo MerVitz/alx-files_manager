@@ -18,7 +18,7 @@ class RedisClient {
   }
 
   isAlive() {
-    return this.client.isReady;  // Check connection properly
+    return this.client.connected;  // Check connection properly
   }
 
   async get(key) {
