@@ -19,11 +19,11 @@ router.get('/disconnect', AuthController.getDisconnect);
 router.get('/users/me', AuthController.getMe);
 
 // File management routes
-router.post('/files', FilesController.postUpload); // Upload a file or create a folder
-router.get('/files', FilesController.getIndex); // List files with pagination
-router.get('/files/:id', FilesController.getShow); // Get details of a specific file
-router.put('/files/:id/publish', FilesController.putPublish); // Publish a file
-router.put('/files/:id/unpublish', FilesController.putUnpublish); // Unpublish a file
-router.get('/files/:id/data', FilesController.getFile); // Get file content
+router.post('/files', FilesController.postUpload);
+router.get('/files', FilesController.getIndex);
+router.get('/files/:id', FilesController.getShow);
+router.put('/files/:id/publish', FilesController.putPublish);
+router.put('/files/:id/unpublish', FilesController.putUnpublish);
+router.get('/files/:id/data', FilesController.getFile);
 
 export default router;

@@ -4,8 +4,8 @@ import redisClient from '../utils/redis.js';
 class AppController {
     static async getStatus(req, res) {
         try {
-            const redisStatus = redisClient.isAlive(); // Check if Redis is alive
-            const dbStatus = await dbClient.isAlive(); // Check if DB is alive
+            const redisStatus = redisClient.isAlive();
+            const dbStatus = dbClient.isAlive();
 
             res.status(200).json({ redis: redisStatus, db: dbStatus });
         } catch (error) {
@@ -26,4 +26,3 @@ class AppController {
 }
 
 export default AppController;
-
