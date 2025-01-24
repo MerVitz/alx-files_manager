@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import mime from 'mime-types';
-import fs from 'fs/promises';
+import fs from 'fs';
+import util from 'util';
 import path from 'path';
 import imageThumbnail from 'image-thumbnail';
 import dbClient from '../utils/db.js';
@@ -9,6 +10,10 @@ import Bull from 'bull';
 
 const UPLOAD_PATH = process.env.UPLOAD_PATH || '/tmp/files';
 const fileQueue = new Bull('fileQueue');
+
+// Promisify fs functions for Node.js 12 compatibility
+const writeFile = util.promisify(fs.writeFile);
+const readFile = util.promisify(fs.readFile);
 
 class FilesController {
   static async postUpload(req, res) {
@@ -45,7 +50,7 @@ class FilesController {
     if (type !== 'folder') {
       const fileId = uuidv4();
       const filePath = path.join(UPLOAD_PATH, fileId);
-      await fs.writeFile(filePath, Buffer.from(data, 'base64'));
+      await writeFile(filePath, Buffer.from(data, 'base64'));
       file.localPath = filePath;
 
       if (type === 'image') {
@@ -90,14 +95,6 @@ class FilesController {
     res.status(200).json(file);
   }
 
-  static async putPublish(req, res) {
-    await FilesController.updateFilePublishStatus(req, res, true);
-  }
-
-  static async putUnpublish(req, res) {
-    await FilesController.updateFilePublishStatus(req, res, false);
-  }
-
   static async getFile(req, res) {
     const file = await dbClient.files.findOne({ _id: req.params.id });
     if (!file || (file.isPublic === false && !(await FilesController.isFileOwner(req, file)))) {
@@ -116,29 +113,13 @@ class FilesController {
     }
 
     try {
-      const content = await fs.readFile(filePath);
+      const content = await readFile(filePath);
       const mimeType = mime.lookup(file.name) || 'application/octet-stream';
       res.setHeader('Content-Type', mimeType);
       res.status(200).send(content);
     } catch (err) {
       res.status(404).json({ error: 'Not found' });
     }
-  }
-
-  static async updateFilePublishStatus(req, res, publishStatus) {
-    const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-    const file = await dbClient.files.findOne({ _id: req.params.id, userId });
-    if (!file) return res.status(404).json({ error: 'Not found' });
-
-    await dbClient.files.updateOne(
-      { _id: req.params.id },
-      { $set: { isPublic: publishStatus, updatedAt: new Date() } }
-    );
-
-    file.isPublic = publishStatus;
-    res.status(200).json(file);
   }
 
   static async getUserFromToken(token) {
