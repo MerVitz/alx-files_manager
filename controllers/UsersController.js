@@ -21,37 +21,27 @@ class UsersController {
     }
 
     try {
-      // Check if the user already exists
       const existingUser = await dbClient.db.collection('users').findOne({ email });
       if (existingUser) {
         return res.status(400).json({ error: 'Already exist' });
       }
 
-      // Hash the password
-      const hash = createHash('sha1');
-      const hashedPassword = hash.update(password).digest('hex');
-
-      // Insert the new user
+      const hashedPassword = createHash('sha1').update(password).digest('hex');
       const newUser = await dbClient.db.collection('users').insertOne({
         email,
         password: hashedPassword,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
       });
 
       res.status(201).json({ id: newUser.insertedId, email });
-
-      // Add a job to the userQueue for sending a welcome email
-      const userQueue = require('../workers/worker.js').userQueue;
-      await userQueue.add({ userId: newUser.insertedId });
-
     } catch (error) {
-      console.error(error);
+      console.error('Error creating user:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   /**
-   * Gets the currently logged-in user
+   * Gets the currently authenticated user
    * @param {Object} req - The request object
    * @param {Object} res - The response object
    */
@@ -74,7 +64,7 @@ class UsersController {
 
       res.status(200).json({ id: user._id, email: user.email });
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching user:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
