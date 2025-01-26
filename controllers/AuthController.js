@@ -13,41 +13,40 @@ class AuthController {
    */
   static async getConnect(req, res) {
     const authHeader = req.headers.authorization;
-
-    // Check if the Authorization header is present
+  
     if (!authHeader || !authHeader.startsWith('Basic ')) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
+  
     try {
-      // Decode Base64 credentials and split into email and password
+      // Decode Base64 credentials
       const base64Credentials = authHeader.split(' ')[1];
       const [email, password] = Buffer.from(base64Credentials, 'base64').toString().split(':');
-
+  
       // Validate email and password
       if (!email || !password) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
-      // Hash the password and find the user
+  
+      // Find user by email and hashed password
       const hashedPassword = createHash('sha1').update(password).digest('hex');
       const user = await dbClient.db.collection('users').findOne({ email, password: hashedPassword });
-
+  
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
-      // Generate a unique token and store it in Redis with a 24-hour expiry
+  
+      // Generate token and store in Redis
       const token = uuidv4();
       await redisClient.set(`auth_${token}`, user._id.toString(), 'EX', 24 * 60 * 60);
-
-      // Return the token
+  
       return res.status(200).json({ token });
     } catch (error) {
       console.error('Error during authentication:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
+  
 
   /**
    * Disconnects a user by invalidating their token
@@ -57,26 +56,25 @@ class AuthController {
    */
   static async getDisconnect(req, res) {
     const token = req.headers['x-token'];
-
-    // Check if the token is provided
+  
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
+  
     try {
-      // Delete the token from Redis
+      // Attempt to delete the token from Redis
       const deleted = await redisClient.del(`auth_${token}`);
       if (deleted === 0) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
-      // Return 204 No Content
+  
       return res.status(204).send();
     } catch (error) {
       console.error('Error during disconnect:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
+  
 
   /**
    * Retrieves the authenticated user's details
