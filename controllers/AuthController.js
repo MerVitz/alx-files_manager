@@ -13,49 +13,47 @@ class AuthController {
    */
   static async getConnect(req, res) {
     const authHeader = req.headers.authorization;
-
-    // Check if the Authorization header is present
+  
     if (!authHeader || !authHeader.startsWith('Basic ')) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
+  
     try {
-      // Decode Base64 credentials and split into email and password
       const base64Credentials = authHeader.split(' ')[1];
       const [email, password] = Buffer.from(base64Credentials, 'base64').toString().split(':');
-
-      // Validate email and password
+  
       if (!email || !password) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
-      // Hash the password and find the user
+  
       const hashedPassword = createHash('sha1').update(password).digest('hex');
       const user = await dbClient.db.collection('users').findOne({ email, password: hashedPassword });
-
+  
       if (!user || !user._id) {
         console.error('User not found or _id is undefined');
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
-      // Generate a unique token and store it in Redis with a 24-hour expiry
+  
       const token = uuidv4();
       const userId = user._id.toString();
-
-      // Log the generated token and userId for debugging
+  
       console.log(`Generated token: ${token}, User ID: ${userId}`);
-
-      // Set key in Redis
-      await redisClient.set(`auth_${token}`, userId);
-      await redisClient.expire(`auth_${token}`, 24 * 60 * 60);
-
-      // Return the token
+  
+      try {
+        await redisClient.set(`auth_${token}`, userId);
+        await redisClient.expire(`auth_${token}`, 24 * 60 * 60);
+      } catch (redisError) {
+        console.error('Error setting key in Redis:', redisError);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+  
       return res.status(200).json({ token });
     } catch (error) {
       console.error('Error during authentication:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
+  
 
   /**
    * Disconnects a user by invalidating their token
