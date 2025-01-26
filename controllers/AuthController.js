@@ -39,7 +39,9 @@ class AuthController {
 
       // Generate a unique token and store it in Redis with a 24-hour expiry
       const token = uuidv4();
-      await redisClient.set(`auth_${token}`, user._id.toString(), 'EX', 24 * 60 * 60);
+      await redisClient.set(`auth_${token}`, user._id.toString()); // Set the key
+      await redisClient.expire(`auth_${token}`, 24 * 60 * 60);     // Set expiry in seconds
+      
 
       // Return the token
       return res.status(200).json({ token });
