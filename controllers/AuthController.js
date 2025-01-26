@@ -39,9 +39,14 @@ class AuthController {
   
       console.log(`Generated token: ${token}, User ID: ${userId}`);
   
+      const expiry = 24 * 60 * 60; // 24 hours in seconds
+  
       try {
+        // Set the token without expiration
         await redisClient.set(`auth_${token}`, userId);
-        await redisClient.expire(`auth_${token}`, 24 * 60 * 60);
+  
+        // Set expiration as a separate command
+        await redisClient.expire(`auth_${token}`, expiry);
       } catch (redisError) {
         console.error('Error setting key in Redis:', redisError);
         return res.status(500).json({ error: 'Internal server error' });
@@ -53,6 +58,7 @@ class AuthController {
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
+  
   
 
   /**
