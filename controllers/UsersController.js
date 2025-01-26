@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { ObjectId } from 'mongodb';
-import dbClient from '../utils/db.js';
-import redisClient from '../utils/redis.js';
+import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
 
 class UsersController {
   /**
