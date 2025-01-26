@@ -33,15 +33,21 @@ class AuthController {
       const hashedPassword = createHash('sha1').update(password).digest('hex');
       const user = await dbClient.db.collection('users').findOne({ email, password: hashedPassword });
 
-      if (!user) {
+      if (!user || !user._id) {
+        console.error('User not found or _id is undefined');
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
       // Generate a unique token and store it in Redis with a 24-hour expiry
       const token = uuidv4();
-      await redisClient.set(`auth_${token}`, user._id.toString()); // Set the key
-      await redisClient.expire(`auth_${token}`, 24 * 60 * 60);     // Set expiry in seconds
-      
+      const userId = user._id.toString();
+
+      // Log the generated token and userId for debugging
+      console.log(`Generated token: ${token}, User ID: ${userId}`);
+
+      // Set key in Redis
+      await redisClient.set(`auth_${token}`, userId);
+      await redisClient.expire(`auth_${token}`, 24 * 60 * 60);
 
       // Return the token
       return res.status(200).json({ token });
