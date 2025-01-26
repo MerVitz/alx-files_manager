@@ -8,6 +8,7 @@ class UsersController {
    * Creates a new user
    * @param {Object} req - The request object
    * @param {Object} res - The response object
+   * @returns {Object} JSON response
    */
   static async postNew(req, res) {
     const { email, password } = req.body;
@@ -33,10 +34,10 @@ class UsersController {
         createdAt: new Date().toISOString(),
       });
 
-      res.status(201).json({ id: newUser.insertedId, email });
+      return res.status(201).json({ id: newUser.insertedId, email });
     } catch (error) {
       console.error('Error creating user:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
@@ -44,6 +45,7 @@ class UsersController {
    * Gets the currently authenticated user
    * @param {Object} req - The request object
    * @param {Object} res - The response object
+   * @returns {Object} JSON response
    */
   static async getMe(req, res) {
     const token = req.headers['x-token'];
@@ -62,10 +64,10 @@ class UsersController {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      res.status(200).json({ id: user._id, email: user.email });
+      return res.status(200).json({ id: user._id, email: user.email });
     } catch (error) {
       console.error('Error fetching user:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 }
