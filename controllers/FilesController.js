@@ -1,12 +1,12 @@
-const { v4: uuidv4 } = require('uuid');
-const mime = require('mime-types');
-const fs = require('fs');
-const util = require('util');
-const path = require('path');
-const imageThumbnail = require('image-thumbnail');
-const dbClient = require('../utils/db');  // Removed .js extension
-const redisClient = require('../utils/redis');  // Removed .js extension
-const Bull = require('bull');
+import { v4 as uuidv4 } from 'uuid';
+import mime from 'mime-types';
+import fs from 'fs';
+import util from 'util';
+import path from 'path';
+import imageThumbnail from 'image-thumbnail';
+import dbClient from '../utils/db';  // Removed .js extension
+import redisClient from '../utils/redis';  // Removed .js extension
+import Bull from 'bull';
 
 const UPLOAD_PATH = process.env.UPLOAD_PATH || '/tmp/files';
 const fileQueue = new Bull('fileQueue');
@@ -168,4 +168,4 @@ class FilesController {
   }
 }
 
-module.exports = FilesController;
+export default FilesController;
