@@ -68,7 +68,7 @@ class UsersController {
       // Find the user by ID
       const user = await dbClient.db.collection('users').findOne({ _id: new ObjectId(userId) });
       if (!user) {
-        return res.status(404).json({ error: 'Not found' });
+        return res.status(401).json({ error: 'Unauthorized' });
       }
 
       // Return user details
