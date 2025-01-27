@@ -3,7 +3,6 @@ import mime from 'mime-types';
 import fs from 'fs';
 import util from 'util';
 import path from 'path';
-import imageThumbnail from 'image-thumbnail';
 import dbClient from '../utils/db.js';
 import redisClient from '../utils/redis.js';
 import Bull from 'bull';
@@ -17,28 +16,31 @@ const readFile = util.promisify(fs.readFile);
 
 class FilesController {
   static async postUpload(req, res) {
-    // Token validation
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Destructure request body
     const { name, type, parentId = 0, isPublic = false, data } = req.body;
 
-    // Check for missing fields
+    // Check for missing name and type
     if (!name) return res.status(400).json({ error: 'Missing name' });
     if (!type || !['folder', 'file', 'image'].includes(type)) {
       return res.status(400).json({ error: 'Missing or invalid type' });
     }
+
+    // Ensure that data is provided when type is file or image (not folder)
     if (type !== 'folder' && !data) {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Check if parentId is valid if it's not 0
+    // Parent ID validation (for files/folders inside other folders)
     let parentFile = null;
     if (parentId) {
       parentFile = await dbClient.files.findOne({ _id: parentId, userId });
-      if (!parentFile || parentFile.type !== 'folder') {
-        return res.status(400).json({ error: 'Parent not found or not a folder' });
+      if (!parentFile) {
+        return res.status(400).json({ error: 'Invalid parentId' });
+      }
+      if (parentFile.type !== 'folder') {
+        return res.status(400).json({ error: 'Parent must be a folder' });
       }
     }
 
@@ -52,25 +54,21 @@ class FilesController {
       updatedAt: new Date(),
     };
 
-    // Handle file creation
     if (type !== 'folder') {
       const fileId = uuidv4();
       const filePath = path.join(UPLOAD_PATH, fileId);
-
-      // Handle data (file or image)
-      if (type === 'image') {
-        // If it's an image, process it using the fileQueue
-        fileQueue.add({ fileId, userId });
-      }
-
       await writeFile(filePath, Buffer.from(data, 'base64'));
       file.localPath = filePath;
+
+      if (type === 'image') {
+        // Image processing logic (if needed)
+        fileQueue.add({ fileId, userId });
+      }
     }
 
-    // Insert file/folder into the database
+    // Insert file/folder into database
     const result = await dbClient.files.insertOne(file);
 
-    // Send back response with file details
     res.status(201).json({
       id: result.insertedId,
       userId,
@@ -148,21 +146,21 @@ class FilesController {
   static async putPublish(req, res) {
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-  
+
     const file = await dbClient.files.findOne({ _id: req.params.id, userId });
     if (!file) return res.status(404).json({ error: 'Not found' });
-  
+
     await dbClient.files.updateOne({ _id: req.params.id }, { $set: { isPublic: true } });
     res.status(200).json({ ...file, isPublic: true });
   }
-  
+
   static async putUnpublish(req, res) {
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-  
+
     const file = await dbClient.files.findOne({ _id: req.params.id, userId });
     if (!file) return res.status(404).json({ error: 'Not found' });
-  
+
     await dbClient.files.updateOne({ _id: req.params.id }, { $set: { isPublic: false } });
     res.status(200).json({ ...file, isPublic: false });
   }
