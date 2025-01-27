@@ -80,7 +80,6 @@ class FilesController {
       parentId: parentId === 0 ? 0 : parentId,
     });
   }
-  
 
   static async getIndex(req, res) {
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
@@ -89,6 +88,7 @@ class FilesController {
     const parentId = req.query.parentId || 0;
     const page = parseInt(req.query.page, 10) || 0;
 
+    // Fetch files with pagination
     const files = await dbClient.files
       .find({ userId, parentId })
       .skip(page * 20)
