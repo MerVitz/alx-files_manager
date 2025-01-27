@@ -1,4 +1,5 @@
 import redis from 'redis';
+import { promisify } from 'util';
 
 class RedisClient {
   constructor() {
@@ -11,6 +12,11 @@ class RedisClient {
     this.client.on('connect', () => {
       console.log('Redis Client Connected');
     });
+
+    // Promisify methods
+    this.setex = promisify(this.client.setex).bind(this.client);
+    this.get = promisify(this.client.get).bind(this.client);
+    this.del = promisify(this.client.del).bind(this.client);
   }
 
   isAlive() {

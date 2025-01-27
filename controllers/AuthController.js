@@ -58,21 +58,20 @@ class AuthController {
   
       console.log('Storing token in Redis:', token, 'for user:', userId);
   
-      // Use Redis 2.x setex method
-      redisClient.setex(`auth_${token}`, 86400, userId, (err, reply) => {
-        if (err) {
-          console.error('Redis setex error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
-        } else {
-          console.log('Redis setex reply:', reply); // Should log "OK"
-          return res.status(200).json({ token });
-        }
-      });
+      try {
+        await redisClient.setex(`auth_${token}`, 86400, userId);
+        console.log('Token successfully stored in Redis');
+        return res.status(200).json({ token });
+      } catch (error) {
+        console.error('Error setting token in Redis:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
     } catch (error) {
       console.error('Error during authentication:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
-  }  
+  }
+    
    
   /**
    * Disconnects a user by invalidating their token
