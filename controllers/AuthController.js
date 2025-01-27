@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import sha1 from 'sha1';
 import { ObjectId } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import redisClient from '../utils/redis';
@@ -29,7 +29,7 @@ class AuthController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
   
-      const hashedPassword = createHash('sha1').update(password.trim(), 'utf8').digest('hex');
+      const hashedPassword = sha1(password.trim());
   
       // Ensure database is connected before query
       if (!dbClient.isAlive()) {
