@@ -17,10 +17,14 @@ const readFile = util.promisify(fs.readFile);
 
 class FilesController {
   static async postUpload(req, res) {
+    // Token validation
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    // Destructure request body
     const { name, type, parentId = 0, isPublic = false, data } = req.body;
+
+    // Check for missing fields
     if (!name) return res.status(400).json({ error: 'Missing name' });
     if (!type || !['folder', 'file', 'image'].includes(type)) {
       return res.status(400).json({ error: 'Missing or invalid type' });
@@ -29,6 +33,7 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
 
+    // Check if parentId is valid if it's not 0
     let parentFile = null;
     if (parentId) {
       parentFile = await dbClient.files.findOne({ _id: parentId, userId });
@@ -47,18 +52,25 @@ class FilesController {
       updatedAt: new Date(),
     };
 
+    // Handle file creation
     if (type !== 'folder') {
       const fileId = uuidv4();
       const filePath = path.join(UPLOAD_PATH, fileId);
-      await writeFile(filePath, Buffer.from(data, 'base64'));
-      file.localPath = filePath;
 
+      // Handle data (file or image)
       if (type === 'image') {
+        // If it's an image, process it using the fileQueue
         fileQueue.add({ fileId, userId });
       }
+
+      await writeFile(filePath, Buffer.from(data, 'base64'));
+      file.localPath = filePath;
     }
 
+    // Insert file/folder into the database
     const result = await dbClient.files.insertOne(file);
+
+    // Send back response with file details
     res.status(201).json({
       id: result.insertedId,
       userId,
@@ -154,7 +166,6 @@ class FilesController {
     await dbClient.files.updateOne({ _id: req.params.id }, { $set: { isPublic: false } });
     res.status(200).json({ ...file, isPublic: false });
   }
-  
 }
 
 export default FilesController;
