@@ -65,7 +65,6 @@ class AuthController {
     }
   }
    
-
   /**
    * Disconnects a user by invalidating their token
    * @param {Object} req - The request object
