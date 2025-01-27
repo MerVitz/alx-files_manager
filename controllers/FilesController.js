@@ -20,21 +20,21 @@ class FilesController {
     // Retrieve user based on the token
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
+  
     // Destructure request body
     const { name, type, parentId = 0, isPublic = false, data } = req.body;
-
+  
     // Validate required fields
     if (!name) return res.status(400).json({ error: 'Missing name' });
     if (!type || !['folder', 'file', 'image'].includes(type)) {
       return res.status(400).json({ error: 'Missing or invalid type' });
     }
-
+  
     // Validate data if type is not 'folder'
     if (type !== 'folder' && !data) {
       return res.status(400).json({ error: 'Missing data' });
     }
-
+  
     // Validate parentId if provided
     let parentFile = null;
     if (parentId) {
@@ -43,7 +43,7 @@ class FilesController {
         return res.status(400).json({ error: 'Parent not found or not a folder' });
       }
     }
-
+  
     const file = {
       userId,
       name,
@@ -53,23 +53,23 @@ class FilesController {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-
+  
     // For files and images, handle file saving to disk
     if (type !== 'folder') {
       const fileId = uuidv4();
       const filePath = path.join(UPLOAD_PATH, fileId);
       await writeFile(filePath, Buffer.from(data, 'base64'));
       file.localPath = filePath;
-
+  
       // Queue image processing if the file is an image
       if (type === 'image') {
         fileQueue.add({ fileId, userId });
       }
     }
-
+  
     // Insert the new file or folder into DB
     const result = await dbClient.files.insertOne(file);
-
+  
     // Return the new file/folder with a 201 status code
     res.status(201).json({
       id: result.insertedId,
@@ -80,6 +80,7 @@ class FilesController {
       parentId: parentId === 0 ? 0 : parentId,
     });
   }
+  
 
   static async getIndex(req, res) {
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
