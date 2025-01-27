@@ -79,7 +79,7 @@ class AuthController {
       console.error('Error during disconnect:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
-  } 
+  }
 
   /**
    * Retrieves the authenticated user's details
