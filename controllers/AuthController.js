@@ -27,19 +27,20 @@ class AuthController {
       }
   
       const hashedPassword = createHash('sha1').update(password).digest('hex');
-      const user = await dbClient.db.collection('users').findOne({ email });
+      const user = await dbClient.db.collection('users').findOne({
+        email,
+        password: hashedPassword,
+      });
   
-      if (!user || user.password !== hashedPassword) {
+      if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
   
       const token = uuidv4();
       const userId = user._id.toString();
-  
-      const expiry = 24 * 60 * 60; // 24 hours in seconds
+      const expiry = 24 * 60 * 60;
   
       try {
-        // Store token in Redis with expiration
         await redisClient.set(`auth_${token}`, userId, 'EX', expiry);
       } catch (redisError) {
         console.error('Error setting key in Redis:', redisError);
@@ -67,18 +68,18 @@ class AuthController {
     }
   
     try {
-      // Attempt to delete the token from Redis
       const deleted = await redisClient.del(`auth_${token}`);
+      console.log(`Redis delete response: ${deleted}`);
       if (!deleted) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
   
-      return res.status(204).send(); // Success: No Content
+      return res.status(204).send();
     } catch (error) {
       console.error('Error during disconnect:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
-  }  
+  } 
 
   /**
    * Retrieves the authenticated user's details
