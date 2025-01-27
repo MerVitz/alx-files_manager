@@ -1,11 +1,12 @@
-import { v4 as uuidv4 } from 'uuid';
-import mime from 'mime-types';
-import fs from 'fs';
-import util from 'util';
-import path from 'path';
-import dbClient from '../utils/db.js';
-import redisClient from '../utils/redis.js';
-import Bull from 'bull';
+const { v4: uuidv4 } = require('uuid');
+const mime = require('mime-types');
+const fs = require('fs');
+const util = require('util');
+const path = require('path');
+const imageThumbnail = require('image-thumbnail');
+const dbClient = require('../utils/db');  // Removed .js extension
+const redisClient = require('../utils/redis');  // Removed .js extension
+const Bull = require('bull');
 
 const UPLOAD_PATH = process.env.UPLOAD_PATH || '/tmp/files';
 const fileQueue = new Bull('fileQueue');
@@ -16,31 +17,30 @@ const readFile = util.promisify(fs.readFile);
 
 class FilesController {
   static async postUpload(req, res) {
+    // Retrieve user based on the token
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    // Destructure request body
     const { name, type, parentId = 0, isPublic = false, data } = req.body;
 
-    // Check for missing name and type
+    // Validate required fields
     if (!name) return res.status(400).json({ error: 'Missing name' });
     if (!type || !['folder', 'file', 'image'].includes(type)) {
       return res.status(400).json({ error: 'Missing or invalid type' });
     }
 
-    // Ensure that data is provided when type is file or image (not folder)
+    // Validate data if type is not 'folder'
     if (type !== 'folder' && !data) {
       return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Parent ID validation (for files/folders inside other folders)
+    // Validate parentId if provided
     let parentFile = null;
     if (parentId) {
       parentFile = await dbClient.files.findOne({ _id: parentId, userId });
-      if (!parentFile) {
-        return res.status(400).json({ error: 'Invalid parentId' });
-      }
-      if (parentFile.type !== 'folder') {
-        return res.status(400).json({ error: 'Parent must be a folder' });
+      if (!parentFile || parentFile.type !== 'folder') {
+        return res.status(400).json({ error: 'Parent not found or not a folder' });
       }
     }
 
@@ -54,21 +54,23 @@ class FilesController {
       updatedAt: new Date(),
     };
 
+    // For files and images, handle file saving to disk
     if (type !== 'folder') {
       const fileId = uuidv4();
       const filePath = path.join(UPLOAD_PATH, fileId);
       await writeFile(filePath, Buffer.from(data, 'base64'));
       file.localPath = filePath;
 
+      // Queue image processing if the file is an image
       if (type === 'image') {
-        // Image processing logic (if needed)
         fileQueue.add({ fileId, userId });
       }
     }
 
-    // Insert file/folder into database
+    // Insert the new file or folder into DB
     const result = await dbClient.files.insertOne(file);
 
+    // Return the new file/folder with a 201 status code
     res.status(201).json({
       id: result.insertedId,
       userId,
@@ -166,4 +168,4 @@ class FilesController {
   }
 }
 
-export default FilesController;
+module.exports = FilesController;
