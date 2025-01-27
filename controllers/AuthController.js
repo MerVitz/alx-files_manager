@@ -12,7 +12,7 @@ class AuthController {
    * @returns {Object} JSON response with the token or an error
    */
   static async getConnect(req, res) {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || req.headers.Authorization;
   
     if (!authHeader || !authHeader.startsWith('Basic ')) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -20,13 +20,21 @@ class AuthController {
   
     try {
       const base64Credentials = authHeader.split(' ')[1];
-      const [email, password] = Buffer.from(base64Credentials, 'base64').toString('utf-8').split(':');
+      const [email, password] = Buffer.from(base64Credentials.trim(), 'base64')
+        .toString('utf-8')
+        .trim()
+        .split(':');
   
       if (!email || !password) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
   
-      const hashedPassword = createHash('sha1').update(password).digest('hex');
+      const hashedPassword = createHash('sha1').update(password.trim(), 'utf8').digest('hex');
+  
+      // Ensure database is connected before query
+      if (!dbClient.isAlive()) {
+        return res.status(500).json({ error: 'Database not connected' });
+      }
   
       // Fetch user from the database
       const user = await dbClient.db.collection('users').findOne({
@@ -42,15 +50,14 @@ class AuthController {
       const token = uuidv4();
       const userId = user._id.toString();
   
-      await redisClient.set(`auth_${token}`, userId, 'EX', 24 * 60 * 60); // 24 hours expiration
+      await redisClient.set(`auth_${token}`, userId, 'EX', 24 * 60 * 60);
   
-      return res.status(200).json({ token });
+      return res.status(200).json({ token: token.trim() });
     } catch (error) {
       console.error('Error during authentication:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
-  }
-  
+  }  
 
   /**
    * Disconnects a user by invalidating their token
