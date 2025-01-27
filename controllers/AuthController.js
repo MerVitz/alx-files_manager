@@ -66,21 +66,22 @@ class AuthController {
     }
   
     try {
-      // Delete token from Redis
-      const deleted = await redisClient.del(`auth_${token}`);
-  
-      if (!deleted) {
+      // Check if the token exists in Redis
+      const exists = await redisClient.get(`auth_${token}`);
+      if (!exists) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
   
-      return res.status(204).send(); // No content
+      // Token exists, now delete it
+      await redisClient.del(`auth_${token}`);
+  
+      return res.status(204).send(); // No content on success
     } catch (error) {
       console.error('Error during disconnect:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
-  
-
+ 
   /**
    * Retrieves the authenticated user's details
    * @param {Object} req - The request object
