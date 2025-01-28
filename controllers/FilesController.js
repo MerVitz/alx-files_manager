@@ -26,17 +26,42 @@ class FilesController {
 
   /** Helper: Validate and check parent folder */
   static async validateParentId(parentId, userId) {
-    if (parentId === 0) return null;
     const parentFile = await dbClient.files.findOne({ _id: parentId, userId });
-    if (!parentFile) throw new Error('Parent not found');
-    if (parentFile.type !== 'folder') throw new Error('Parent is not a folder');
+    if (!parentFile) {
+      throw new Error('Parent not found');
+    }
+    if (parentFile.type !== 'folder') {
+      throw new Error('Parent is not a folder');
+    }
     return parentFile;
   }
-
+  
   /** Helper: Ensure folder exists */
+  static async ensureFolderExists(folderPath) {
+    try {
+      await stat(folderPath);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        await mkdir(folderPath, { recursive: true });
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  /** Helper: Check file access (public or owner) */
+  static async canAccessFile(req, file) {
+    const userId = await FilesController.getUserFromToken(req.headers['x-token']);
+    return file.isPublic || (userId && file.userId === userId);
+  }
+
+  /** POST /files: Upload a file or folder */
   static async postUpload(req, res) {
-    const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const token = req.headers['x-token'];
+    const userId = await FilesController.getUserFromToken(token);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   
     const { name, type, parentId = 0, isPublic = false, data } = req.body;
   
@@ -54,18 +79,29 @@ class FilesController {
       return res.status(400).json({ error: 'Missing data' });
     }
   
-    try {
-      const parentFile = await FilesController.validateParentId(parentId, userId);
-      const file = {
-        userId,
-        name,
-        type,
-        isPublic,
-        parentId: parentId === 0 ? 0 : parentId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    // Validate parentId
+    let parentFile = null;
+    if (parentId !== 0) {
+      try {
+        parentFile = await FilesController.validateParentId(new ObjectId(parentId), userId);
+      } catch (err) {
+        return res.status(400).json({ error: err.message });
+      }
+    }
   
+    // Prepare file data
+    const file = {
+      userId,
+      name,
+      type,
+      isPublic,
+      parentId: parentId === 0 ? 0 : parentId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  
+    try {
+      // For files (not folders), write data to local storage
       if (type !== 'folder') {
         await FilesController.ensureFolderExists(FOLDER_PATH);
   
@@ -75,73 +111,25 @@ class FilesController {
         file.localPath = filePath;
       }
   
+      // Insert file/folder into the database
       const result = await dbClient.files.insertOne(file);
+  
       return res.status(201).json({
-        id: result.insertedId,
-        ...file,
+        id: result.insertedId.toString(),
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+        createdAt: file.createdAt,
+        updatedAt: file.updatedAt,
       });
     } catch (err) {
-      const errorMessage = err.message || 'Failed to process the request';
-      return res.status(500).json({ error: errorMessage });
+      console.error('Error uploading file:', err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
   
-
-  /** Helper: Check file access (public or owner) */
-  static async canAccessFile(req, file) {
-    const userId = await FilesController.getUserFromToken(req.headers['x-token']);
-    return file.isPublic || (userId && file.userId === userId);
-  }
-
-  /** POST /files: Upload a file or folder */
-  static async postUpload(req, res) {
-    const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-  
-    const { name, type, parentId = 0, isPublic = false, data } = req.body;
-  
-    // Validate required fields
-    if (!name) return res.status(400).json({ error: 'Missing name' });
-    if (!type) return res.status(400).json({ error: 'Missing type' });
-    if (!['folder', 'file', 'image'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid type' });
-    }
-    if (type !== 'folder' && !data) {
-      return res.status(400).json({ error: 'Missing data' });
-    }
-  
-    try {
-      const parentFile = await FilesController.validateParentId(parentId, userId);
-      const file = {
-        userId,
-        name,
-        type,
-        isPublic,
-        parentId: parentId === 0 ? 0 : parentId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-  
-      if (type !== 'folder') {
-        await FilesController.ensureFolderExists(FOLDER_PATH);
-  
-        const fileId = uuidv4();
-        const filePath = path.join(FOLDER_PATH, fileId);
-        await writeFile(filePath, Buffer.from(data, 'base64'));
-        file.localPath = filePath;
-      }
-  
-      const result = await dbClient.files.insertOne(file);
-      return res.status(201).json({
-        id: result.insertedId,
-        ...file,
-      });
-    } catch (err) {
-      const errorMessage = err.message || 'Failed to process the request';
-      return res.status(400).json({ error: errorMessage });
-    }
-  }
-
   /** GET /files/:id: Retrieve file details */
   static async getShow(req, res) {
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
