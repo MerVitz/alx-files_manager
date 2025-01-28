@@ -56,16 +56,19 @@ class FilesController {
   static async postUpload(req, res) {
     const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
+  
     const { name, type, parentId = 0, isPublic = false, data } = req.body;
+  
+    // Validate required fields
     if (!name) return res.status(400).json({ error: 'Missing name' });
+    if (!type) return res.status(400).json({ error: 'Missing type' });
     if (!['folder', 'file', 'image'].includes(type)) {
-      return res.status(400).json({ error: 'Missing or invalid type' });
+      return res.status(400).json({ error: 'Invalid type' });
     }
     if (type !== 'folder' && !data) {
       return res.status(400).json({ error: 'Missing data' });
     }
-
+  
     try {
       const parentFile = await FilesController.validateParentId(parentId, userId);
       const file = {
@@ -77,16 +80,16 @@ class FilesController {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-
+  
       if (type !== 'folder') {
         await FilesController.ensureFolderExists(FOLDER_PATH);
-
+  
         const fileId = uuidv4();
         const filePath = path.join(FOLDER_PATH, fileId);
         await writeFile(filePath, Buffer.from(data, 'base64'));
         file.localPath = filePath;
       }
-
+  
       const result = await dbClient.files.insertOne(file);
       return res.status(201).json({
         id: result.insertedId,
