@@ -34,17 +34,58 @@ class FilesController {
   }
 
   /** Helper: Ensure folder exists */
-  static async ensureFolderExists(folderPath) {
+  static async postUpload(req, res) {
+    const { userId } = await FilesController.getUserFromToken(req.headers['x-token']);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  
+    const { name, type, parentId = 0, isPublic = false, data } = req.body;
+  
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({ error: 'Missing name' });
+    }
+    if (!type) {
+      return res.status(400).json({ error: 'Missing type' });
+    }
+    if (!['folder', 'file', 'image'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+    if (type !== 'folder' && !data) {
+      return res.status(400).json({ error: 'Missing data' });
+    }
+  
     try {
-      await stat(folderPath);
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        await mkdir(folderPath, { recursive: true });
-      } else {
-        throw err;
+      const parentFile = await FilesController.validateParentId(parentId, userId);
+      const file = {
+        userId,
+        name,
+        type,
+        isPublic,
+        parentId: parentId === 0 ? 0 : parentId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+  
+      if (type !== 'folder') {
+        await FilesController.ensureFolderExists(FOLDER_PATH);
+  
+        const fileId = uuidv4();
+        const filePath = path.join(FOLDER_PATH, fileId);
+        await writeFile(filePath, Buffer.from(data, 'base64'));
+        file.localPath = filePath;
       }
+  
+      const result = await dbClient.files.insertOne(file);
+      return res.status(201).json({
+        id: result.insertedId,
+        ...file,
+      });
+    } catch (err) {
+      const errorMessage = err.message || 'Failed to process the request';
+      return res.status(500).json({ error: errorMessage });
     }
   }
+  
 
   /** Helper: Check file access (public or owner) */
   static async canAccessFile(req, file) {
